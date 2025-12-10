@@ -1,10 +1,15 @@
 import { GoogleGenAI } from "@google/genai";
-import { PRODUCTS, COMPANY_INFO, CATEGORIES } from '../constants';
+import { PRODUCTS, COMPANY_INFO, CATEGORIES } from "../constants";
 
-const apiKey = (process.env.GEMINI_API_KEY as string) || (import.meta.env.VITE_GEMINI_API_KEY as string);
+// Resolve API key from Vite or environment (support multiple forms)
+const apiKey =
+  (import.meta as any).env?.VITE_GEMINI_API_KEY ||
+  (import.meta as any).env?.VITE_API_KEY ||
+  process.env.GEMINI_API_KEY ||
+  process.env.VITE_GEMINI_API_KEY;
 
 const getSystemInstruction = () => {
-  return `You are a helpful customer service assistant for ${COMPANY_INFO.name}. 
+  return `You are a helpful customer service assistant for ${COMPANY_INFO.name}.
 ${COMPANY_INFO.tagline}
 
 Company Information:
@@ -15,31 +20,33 @@ Company Information:
 - Address: ${COMPANY_INFO.address}
 - Established: ${COMPANY_INFO.established}
 
-Available Products and Categories:
-${CATEGORIES.map(cat => `- ${cat.name}`).join('\n')}
+Available Products:
+${CATEGORIES.map(c => `• ${c.name}`).join("\n")}
 
-You should help customers inquire about products, services, and company information. Be professional and helpful.`;
+Be professional and concise.`;
 };
 
-export const sendMessageToGemini = async (message, history) => {
-  if (!apiKey) return "Server error: API key missing.";
+export const sendMessageToGemini = async (message: string, history: any[] = []) => {
+  if (!apiKey) return "API key missing in environment.";
 
   try {
     const ai = new GoogleGenAI({ apiKey });
 
     const chat = ai.chats.create({
-      model: 'gemini-2.5-flash',
+      model: "gemini-2.5-flash",
       config: {
         systemInstruction: getSystemInstruction(),
         temperature: 0.7,
       },
-      history
+      history,
     });
 
     const result = await chat.sendMessage({ message });
-    return result.text;
-  } catch (err) {
-    console.error("Gemini API Error:", err);
-    return "Temporary server issue. Please try again later.";
+
+    // `result.text` is the typical simple accessor; fall back to nested fields if needed
+    return (result as any).text || (result as any).response?.text || "";
+  } catch (error) {
+    console.error("Gemini API Error:", error);
+    return "Something went wrong, please try again in a moment.";
   }
 };
